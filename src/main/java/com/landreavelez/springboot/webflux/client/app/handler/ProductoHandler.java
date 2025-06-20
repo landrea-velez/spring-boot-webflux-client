@@ -33,21 +33,12 @@ public class ProductoHandler {
 	public Mono<ServerResponse> ver(ServerRequest request){
 		String id = request.pathVariable("id");
 		
-		return service.findById(id).flatMap(p -> ServerResponse.ok()
+		return errorHandler(
+				service.findById(id).flatMap(p -> ServerResponse.ok()
 				.contentType(MediaType.APPLICATION_JSON)
 				.bodyValue(p))
 				.switchIfEmpty(ServerResponse.notFound().build())
-				.onErrorResume(error -> {
-					WebClientResponseException errorResponse = (WebClientResponseException) error;
-					if(errorResponse.getStatusCode() == HttpStatus.NOT_FOUND) {
-						Map<String, Object> body = new HashMap<>();
-						body.put("error", "No existe el producto: ".concat(errorResponse.getMessage()));
-						body.put("timestamp", new Date());
-						body.put("status", errorResponse.getStatusCode().value());
-						return ServerResponse.status(HttpStatus.NOT_FOUND).bodyValue(body);
-					}
-					return Mono.error(errorResponse);
-				});
+				);
 	}
 	
 	public Mono<ServerResponse> crear(ServerRequest request){
@@ -76,47 +67,46 @@ public class ProductoHandler {
 		Mono<Producto> producto = request.bodyToMono(Producto.class);
 		String id = request.pathVariable("id");
 		
-		return producto
+		return errorHandler(
+				 producto
 				.flatMap(p -> service.update(p, id))
 				.flatMap(p-> ServerResponse.created(URI.create("/api/client/".concat(p.getId())))
 				.contentType(MediaType.APPLICATION_JSON)
 				.bodyValue(p))
-				.onErrorResume(error -> {
-					WebClientResponseException responseError = (WebClientResponseException) error;
-					if(responseError.getStatusCode() == HttpStatus.NOT_FOUND) {
-						return ServerResponse.notFound().build();
-					}
-					return Mono.error(responseError);
-				});
+				);
 	}
 	
 	public Mono<ServerResponse> eliminar(ServerRequest request){
 		String id = request.pathVariable("id");
-		return service.delete(id).then(ServerResponse.noContent().build())
-				.onErrorResume(error -> {
-					WebClientResponseException responseError = (WebClientResponseException) error;
-					if(responseError.getStatusCode() == HttpStatus.NOT_FOUND) {
-						return ServerResponse.notFound().build();
-					}
-					return Mono.error(responseError);
-				});
+		return errorHandler(
+				service.delete(id).then(ServerResponse.noContent().build())
+				);
 	}
 	
 	public Mono<ServerResponse> upload(ServerRequest request){
 		String id = request.pathVariable("id");
-		return request.multipartData().map(multipart -> multipart.toSingleValueMap().get("file"))
+		return errorHandler(
+				request.multipartData().map(multipart -> multipart.toSingleValueMap().get("file"))
 				.cast(FilePart.class)
 				.flatMap(file -> service.upload(file, id))
 				.flatMap(p -> ServerResponse.created(URI.create("/api/client/".concat(p.getId())))
 						.contentType(MediaType.APPLICATION_JSON)
 						.bodyValue(p))
-				.onErrorResume(error -> {
-					WebClientResponseException responseError = (WebClientResponseException) error;
-					if(responseError.getStatusCode() == HttpStatus.NOT_FOUND) {
-						return ServerResponse.notFound().build();
-					}
-					return Mono.error(responseError);
-				});
+				);
+	}
+	
+	private Mono<ServerResponse> errorHandler(Mono<ServerResponse> response){
+		return response.onErrorResume(error -> {
+			WebClientResponseException errorResponse = (WebClientResponseException) error;
+			if(errorResponse.getStatusCode() == HttpStatus.NOT_FOUND) {
+				Map<String, Object> body = new HashMap<>();
+				body.put("error", "No existe el producto: ".concat(errorResponse.getMessage()));
+				body.put("timestamp", new Date());
+				body.put("status", errorResponse.getStatusCode().value());
+				return ServerResponse.status(HttpStatus.NOT_FOUND).syncBody(body);
+			}
+			return Mono.error(errorResponse);
+		});
 	}
 
 }
