@@ -52,8 +52,7 @@ public class ProductoServiceImpl implements ProductoService {
 	}
 
 	@Override
-	public Mono<Producto> update(Producto producto, String id){
-		
+	public Mono<Producto> update(Producto producto, String id){		
 		return client.put()
 				.uri("/{id}", Collections.singletonMap("id", id))
 				.accept(APPLICATION_JSON)
@@ -65,7 +64,8 @@ public class ProductoServiceImpl implements ProductoService {
 
 	@Override
 	public Mono<Void> delete(String id){
-		return client.delete().uri("/{id}", Collections.singletonMap("id", id))
+		return client.delete()
+				.uri("/{id}", Collections.singletonMap("id", id))
 				.retrieve()
 				.bodyToMono(Void.class);
 	}
@@ -73,6 +73,7 @@ public class ProductoServiceImpl implements ProductoService {
 	@Override
 	public Mono<Producto> upload(FilePart file, String id){
 		MultipartBodyBuilder parts = new MultipartBodyBuilder();
+		
 		parts.asyncPart("file", file.content(), DataBuffer.class).headers(h -> {
 			h.setContentDispositionFormData("file", file.filename());
 		});
