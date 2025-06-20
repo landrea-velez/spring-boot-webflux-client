@@ -2,6 +2,8 @@ package com.landreavelez.springboot.webflux.client.app.handler;
 
 import java.net.URI;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -36,11 +38,15 @@ public class ProductoHandler {
 				.bodyValue(p))
 				.switchIfEmpty(ServerResponse.notFound().build())
 				.onErrorResume(error -> {
-					WebClientResponseException responseError = (WebClientResponseException) error;
-					if(responseError.getStatusCode() == HttpStatus.NOT_FOUND) {
-						return ServerResponse.notFound().build();
+					WebClientResponseException errorResponse = (WebClientResponseException) error;
+					if(errorResponse.getStatusCode() == HttpStatus.NOT_FOUND) {
+						Map<String, Object> body = new HashMap<>();
+						body.put("error", "No existe el producto: ".concat(errorResponse.getMessage()));
+						body.put("timestamp", new Date());
+						body.put("status", errorResponse.getStatusCode().value());
+						return ServerResponse.status(HttpStatus.NOT_FOUND).bodyValue(body);
 					}
-					return Mono.error(responseError);
+					return Mono.error(errorResponse);
 				});
 	}
 	
@@ -72,7 +78,7 @@ public class ProductoHandler {
 		
 		return producto
 				.flatMap(p -> service.update(p, id))
-				.flatMap(p-> ServerResponse.created(URI.create("/api/client/".concat(id)))
+				.flatMap(p-> ServerResponse.created(URI.create("/api/client/".concat(p.getId())))
 				.contentType(MediaType.APPLICATION_JSON)
 				.bodyValue(p))
 				.onErrorResume(error -> {
